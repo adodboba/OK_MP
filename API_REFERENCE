@@ -1,0 +1,78 @@
+# Справочник по Ozon Seller API
+
+Все методы — POST, авторизация через заголовки `Client-Id` + `Api-Key`.
+Base URL: `https://api-seller.ozon.ru`
+
+## Используемые методы
+
+### 1. `/v1/roles` — Проверка ключа
+- **Назначение:** проверка валидности API-ключа
+- **Используется в:** `Auth.gs → checkApiKey`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/Roles
+
+### 2. `/v3/product/list` — Список товаров
+- **Назначение:** постраничный список product_id
+- **Лимит:** `limit: 1..1000`
+- **Пагинация:** через `last_id`
+- **Используется в:** `Api_Products.gs → fetchProductIds`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/ProductAPI_GetProductList
+
+### 3. `/v3/product/info/list` — Детали товаров
+- **Назначение:** базовые данные о товарах (цены, статусы, комиссии, ID категории)
+- **Лимит:** **1000 ID** в сумме по `offer_id` + `product_id` + `sku`
+- **Используется в:** `Api_Products.gs → fetchProductInfo`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/ProductAPI_GetProductInfoList
+
+### 4. `/v4/product/info/attributes` — Атрибуты товаров
+- **Назначение:** бренд, тип товара, характеристики
+- **Лимит:** **1000 product_id** в одном запросе
+- **Используется в:** `Api_Attributes.gs → fetchAttributesByProductIds`
+- **Важно:** обязательное поле `filter` (было исправлено после ошибки 400)
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/ProductAPI_GetProductAttributesV4
+
+### 5. `/v4/product/info/stocks` — Остатки
+- **Назначение:** остатки по схемам FBO/FBS/rFBS/FBP
+- **Лимит:** 1000 product_id за запрос
+- **Пагинация:** cursor
+- **Используется в:** `Api_Stocks.gs → fetchStocksByProductIds`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/ProductAPI_GetProductInfoStocks
+
+### 6. `/v4/posting/fbs/list` — FBS-отправления
+- **Назначение:** список FBS-отправлений за период
+- **Лимит:** `limit: 1..100`
+- **Пагинация:** cursor + has_next
+- **Особенность:** v3 **deprecated с 31.08.2026**, используем v4 [citation:7]
+- **Используется в:** `Api_Postings.gs → fetchFbsPostings`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/PostingAPI_GetFbsPostingListV4
+
+### 7. `/v3/posting/fbo/list` — FBO-отправления
+- **Назначение:** список FBO-отправлений за период
+- **Лимит:** `limit: 1..100`
+- **Пагинация:** offset
+- **Используется в:** `Api_Postings.gs → fetchFboPostings`
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/PostingAPI_GetFboPostingList
+
+### 8. `/v1/report/postings/create` (резерв) — CSV-отчёт
+- **Назначение:** асинхронный CSV-отчёт по отправлениям
+- **Особенность:** **только одна схема** в `delivery_schema`, rFBS не поддерживается
+- **Используется в:** `Api_Reports.gs → createPostingsReport` (устаревший метод)
+- **Документация:** https://docs.ozon.ru/api/seller/#operation/ReportAPI_CreateCompanyPostingsReport
+
+## Источники документации
+
+- **Официальная:** https://docs.ozon.ru/api/seller/
+- **OpenAPI-спека:** https://github.com/MissiaL/ozon-api [citation:7]
+- **Английская документация:** https://github.com/DragonSigh/ozon-seller-api-docs [citation:12]
+
+## Лимиты
+
+| Параметр | Значение |
+|---|---|
+| Глобальный RPS | 50 на Client-Id |
+| Безопасный RPS | 40 (80%) |
+| Точечные RPS | 2 для FBO-поставок (`/v1/supply-order/*`) |
+| Операции с товарами | 30 000/мин (с 24.02.2026) |
+| Batch product/info/list | 1000 |
+| Batch attributes | 1000 |
+| Batch stocks | 1000 |
+| Page size postings | 100 |
