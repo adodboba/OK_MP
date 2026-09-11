@@ -1,6 +1,15 @@
 # Changelog
+### Запланировано
+- Анализ «утечек денег» в маркетплейсе (см. `IMPROVEMENTS.md`)
+- Performance API для рекламы
+- AI-прогнозы спроса
 
 ## [1.0.0] — 2026-09-11
+
+### Добавлено
+- Документация проекта: `docs/README.md`, `ARCHITECTURE.md`, `API_REFERENCE.md`, `TECHNICAL_PLAN.md`, `CHANGELOG.md`, `IMPROVEMENTS.md`
+- AI-экспорт дашборда: `AiExport.gs` + `AiExportDialog.html` + пункт меню «🤖 Экспорт для AI»
+- Раздел «Управление задачами» — интеграция с **Okala** (Kanban)
 
 ### Добавлено
 - Синхронизация номенклатуры по 6 кабинетам (28 колонок + бренд + тип)
