@@ -1,0 +1,78 @@
+# Технический план
+
+## Статус
+
+| Фаза | Статус |
+|---|---|
+| Инициализация | ✅ Завершено |
+| Номенклатура | ✅ Завершено |
+| Остатки | ✅ Завершено |
+| Отправления (синхронные) | ✅ Завершено |
+| Дашборд | ✅ Завершено |
+| Автоматизация (триггер) | ✅ Завершено |
+| Performance API (реклама) | 📋 Запланировано |
+
+## Что сделано
+
+### Фаза 1. Инфраструктура
+- [x] `Config.gs` с 6 аккаунтами
+- [x] `Timing.gs` — тайминги и лимиты
+- [x] `Auth.gs` с кешем проверки ключей
+- [x] `ApiClient.gs` — throttle + retry + backoff
+- [x] `Utils.gs` — универсальные хелперы
+
+### Фаза 2. Номенклатура
+- [x] `Api_Products.gs` (list + info)
+- [x] `Api_Attributes.gs` (бренд + тип)
+- [x] `Process_Products.gs` — 28 колонок
+- [x] `Process_Attributes.gs` с кешем
+- [x] Кеш атрибутов через `CacheService`
+
+### Фаза 3. Остатки
+- [x] `Api_Stocks.gs` (только FBO/FBS)
+- [x] `Process_Stocks.gs` (7 колонок)
+- [x] `Sheet_Stocks.gs`
+
+### Фаза 4. Отправления (переход на синхронные)
+- [x] `Api_Postings.gs` (FBS v4 + FBO v3)
+- [x] `Process_Postings.gs` (19 колонок: +region, cluster_from, cluster_to)
+- [x] `Sheet_RawDaily.gs` (дедупликация по `posting_number|sku`)
+- [x] `Main.gs → collectPostingsForRange`
+
+### Фаза 5. Дашборд
+- [x] 12 блоков
+- [x] Условное форматирование
+- [x] Notes-подсказки
+- [x] 3 диаграммы
+
+### Фаза 6. Автоматизация
+- [x] `Triggers.gs → setupDailyTrigger`
+- [x] `runDailySync` (9:00 МСК)
+- [x] HTML-панель `DashboardDialog.html`
+
+## Что в резерве
+
+| Функция | Причина |
+|---|---|
+| `appendPostingsYesterdayAllAccounts_OLD` | Старый CSV-метод |
+| `syncPostingsReportsForAccounts_OLD` | То же |
+| `Api_Reports.gs`, `Process_Reports.gs`, `Sheet_Reports.gs` | Только для CSV-метода |
+
+## Запланировано
+
+### Фаза 7. Performance API (реклама)
+- [ ] OAuth-токен для Performance API (не Seller API!)
+- [ ] `Api_Advertising.gs`
+- [ ] Выгрузка товаров в рекламе + показатели
+- [ ] Отдельный лист «Реклама»
+
+### Фаза 8. Расширенный дашборд
+- [ ] Себестоимость (для чистой выручки)
+- [ ] Логистика и комиссии в дашборде
+- [ ] Возвраты отдельным методом (сейчас из status)
+- [ ] Реклама в дашборде
+
+### Фаза 9. Рефакторинг (опционально)
+- [ ] Переход на TypeScript + clasp [citation:11]
+- [ ] Git-версионирование через `clasp push/pull`
+- [ ] ESLint + Prettier
