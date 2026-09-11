@@ -1,0 +1,113 @@
+# Архитектура проекта
+
+## Общая схема
+┌──────────────────────────────────────────────────────┐
+│ Google Sheets (SPREADSHEET_ID) │
+│ ┌────────────────┬───────────────┬────────────────┐ │
+│ │ «Номенклатура» │ «Остатки» │ Raw_Daily │ │
+│ └────────────────┴───────────────┴────────────────┘ │
+│ ┌────────────────┐ │
+│ │ Dashboard │ │
+│ └────────────────┘ │
+└──────────────────────────────────────────────────────┘
+▲ ▲
+│ │
+┌─────────────┴────────┐ ┌───────────┴──────────────┐
+│ Sheet*.gs │ │ Dashboard.gs │
+│ (запись на листы) │ │ (12 блоков + графики) │
+└─────────────▲────────┘ └───────────▲──────────────┘
+│ │
+┌─────────────┴────────┐ ┌───────────┴──────────────┐
+│ Process.gs │ │ Process_Postings.gs │
+│ (обработка JSON) │ │ (flatten отправлений) │
+└─────────────▲────────┘ └───────────▲──────────────┘
+│ │
+┌─────────────┴────────┐ ┌───────────┴──────────────┐
+│ Api_.gs │ │ Api_Postings.gs │
+│ (сырые вызовы) │ │ (FBS/FBO списки) │
+└─────────────▲────────┘ └───────────▲──────────────┘
+│ │
+└────────────┬───────────┘
+│
+┌────────────┴────────────┐
+│ ApiClient.gs │
+│ (ozonFetch) │
+└────────────▲────────────┘
+│
+┌────────────┴────────────┐
+│ Auth.gs │
+│ (заголовки + кеш) │
+└────────────▲────────────┘
+│
+┌────────────┴────────────┐
+│ Config.gs + Timing.gs │
+│ (аккаунты + лимиты) │
+└─────────────────────────┘
+
+## Файловая структура
+
+### Конфигурация
+| Файл | Назначение |
+|---|---|
+| `Config.gs` | `ACCOUNTS` (6 кабинетов), `SPREADSHEET_ID`, `SHEETS`, `API_BASE`, `RAW_DAILY_HEADERS` |
+| `Timing.gs` | RPS, таймауты, `sleep`, `throttle`, `isTimeLimitReached`, `backoffDelay` |
+| `ApiLimits.gs` | `OZON_METHOD_LIMITS` — лимиты по методам (maxBatch, pageSize, rps) |
+
+### Транспорт
+| Файл | Назначение |
+|---|---|
+| `Auth.gs` | `getAuthHeaders`, `assertAccountValid` (кеш 24ч), `resetAuthCache` |
+| `ApiClient.gs` | `ozonFetch` (throttle + retry + backoff), `_parseRetryAfter` |
+| `Utils.gs` | `_safeStr`, `_toNum`, `_toDate`, `_jsonOrEmpty`, `_joinArr`, `_ruColorIndex` |
+
+### API-модули
+| Файл | Метод | Назначение |
+|---|---|---|
+| `Api_Products.gs` | `/v3/product/list`, `/v3/product/info/list` | Номенклатура |
+| `Api_Attributes.gs` | `/v4/product/info/attributes` | Бренд + тип товара |
+| `Api_Stocks.gs` | `/v4/product/info/stocks` | Остатки FBO/FBS |
+| `Api_Postings.gs` | `/v4/posting/fbs/list`, `/v3/posting/fbo/list` | Отправления |
+| `Api_Reports.gs` (резерв) | `/v1/report/postings/create` | Старый CSV-метод |
+
+### Обработка
+| Файл | Назначение |
+|---|---|
+| `Process_Products.gs` | `flattenProducts` (28 колонок), `filterArchived` |
+| `Process_Attributes.gs` | `buildAttributesIndex` с кешем |
+| `Process_Stocks.gs` | `readProductIdsForAccount`, `flattenStocks` (FBO/FBS) |
+| `Process_Postings.gs` | `flattenFbsPostings`, `flattenFboPostings` (19 колонок) |
+| `Process_Reports.gs` (резерв) | CSV-парсер |
+
+### Запись
+| Файл | Назначение |
+|---|---|
+| `Sheet_Common.gs` | `writeSheetGeneric` — очистка + запись + формат |
+| `Sheet_Products.gs` | `writeProductsSheet` (обёртка) |
+| `Sheet_Stocks.gs` | `writeStocksSheet` (обёртка) |
+| `Sheet_RawDaily.gs` | `ensureRawDailySheet`, `appendRawDailyRows`, `filterNewRawRows` |
+
+### Оркестрация
+| Файл | Назначение |
+|---|---|
+| `Main.gs` | `runDailySync`, `syncNomenclatureAllAccounts`, `syncStocksAllAccounts`, `appendPostingsYesterdayAllAccounts` |
+| `Dashboard.gs` | `rebuildDashboard` — 12 блоков, графики, Notes |
+| `Settings.gs` | `openDashboardDialog`, `collectPostingsFromDialog` |
+| `Menu.gs` | `onOpen` — меню с подменю «Старые методы» |
+| `Triggers.gs` | `setupDailyTrigger` (9:00) |
+| `DashboardDialog.html` | HTML-панель выбора дат и кабинетов |
+
+## Поток данных
+
+### Ежедневный запуск (`runDailySync`)
+1. `syncNomenclatureAllAccounts()` → 6 кабинетов × (product list + info + attributes) → лист «Номенклатура»
+2. `syncStocksAllAccounts()` → 6 кабинетов → `/v4/product/info/stocks` → лист «Остатки»
+3. `appendPostingsYesterdayAllAccounts()` → 6 кабинетов × FBS/FBO → `_Raw_Daily`
+4. `rebuildDashboard()` → читает `_Raw_Daily`, «Номенклатура», «Остатки» → лист `_Dashboard`
+
+### Двухфазная работа (ручной backfill)
+- Если нужно дособрать данные за 30 дней — используется `backfillRawDailyFromPeriod(30)`
+- Каждый день в диапазоне обрабатывается отдельно через `collectPostingsForRange`
+
+## Мультикабинетность
+
+Все функции принимают `account` объект `{ name, clientId, apiKey }`. Троттлинг и кеш разделены по `clientId`. Данные на листах — с колонкой `кабинет` в первой позиции.
